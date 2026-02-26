@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  fullName  String
+  role      Role     @default(VIEWER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdProperties Property[]  @relation("CreatedBy")
+  uploadedFiles     File[]      @relation("UploadedBy")
+  createdUsers      User[]      @relation("CreatedByAdmin")
+  createdBy         User?       @relation("CreatedByAdmin", fields: [createdById], references: [id])
+  createdById       String?
+  activities        ActivityLog[] @relation("ActivityLogs")
+
+  @@map("users")
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model Property {
+  id                     String         @id @default(uuid())
+  internalCode           String         @unique
+  status                 PropertyStatus @default(ACTIVE)
+  isPublic               Boolean        @default(false)
+  ubicacionMigrada       String?
+  denominado             String?
+  viasDeAcceso           String?
+  usoActual              String?
+  superficieTerreno      String?
+  superficieConstruccion String?
+  noContaAgua            Boolean        @default(false)
+  noContaPredial         Boolean        @default(false)
+  observaciones          String?
+  propertyType           String?        @default("CASA HABITACIONAL")
+  category               String?        @default("MXP UNIFAMILIARES")
+  libros                 String?
+  numeroExpediente       String?
+  tipoCredito            String?
+  rfcDeudor              String?
+  soporteGravamen        String?
+  fechaRegistro          DateTime?
+  importeAdjudicacion    Decimal?       @db.Decimal(18, 2)
+  importeAdeudo          Decimal?       @db.Decimal(18, 2)
+  fechaAperturaCredito   DateTime?
+  importeAperturaCredito Decimal?       @db.Decimal(18, 2)
+  fechaAvaluo            DateTime?
+  importeAvaluo          Decimal?       @db.Decimal(18, 2)
+  fechaUltimoAvaluo      DateTime?
+  importeUltimoAvaluo    Decimal?       @db.Decimal(18, 2)
+  fechaAdjudicacion      DateTime?
+  valorLibros            Decimal?       @db.Decimal(18, 2)
+  calle                  String?
+  colonia                String?
+  municipio              String?
+  estado                 String?
+  cp                     String?
+  pais                   String?        @default("MEXICO")
+  propietarioNombre      String?
+  numeroBienes           Int?           @default(1)
+  centroCostos           String?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  createdBy              User?          @relation("CreatedBy", fields: [createdById], references: [id])
+  createdById            String?
+  files                  File[]
+  expedientes            Expediente[]
+  activities             ActivityLog[]  @relation("PropertyLogs")
+
+  @@map("properties")
+}
+
+enum PropertyStatus {
+  ACTIVE
+  SOLD
+  PENDING
+  INACTIVE
+}
+
+model Expediente {
+  id            String   @id @default(uuid())
+  numero        Int
+  titulo        String
+  descripcion   String?
+  adjudicadoPor String?
+  fechaIngreso  DateTime @default(now())
+  property      Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId    String
+  files         File[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("expedientes")
+}
+
+model File {
+  id           String      @id @default(uuid())
+  filename     String
+  originalName String
+  mimetype     String
+  size         Int
+  path         String
+  fileType     FileType
+  property     Property?   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId   String?
+  expediente   Expediente? @relation(fields: [expedienteId], references: [id], onDelete: Cascade)
+  expedienteId String?
+  uploadedBy   User?       @relation("UploadedBy", fields: [uploadedById], references: [id])
+  uploadedById String?
+  createdAt    DateTime    @default(now())
+
+  @@map("files")
+}
+
+enum FileType {
+  PDF
+  WORD
+  IMAGE
+  OTHER
+}
+
+enum ActivityAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+model ActivityLog {
+  id          String         @id @default(uuid())
+  action      ActivityAction
+  entityType  String
+  entityId    String
+  description String
+  changes     String?
+  
+  userId      String
+  user        User           @relation("ActivityLogs", fields: [userId], references: [id])
+  
+  propertyId  String?
+  property    Property?      @relation("PropertyLogs", fields: [propertyId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime       @default(now())
+
+  @@map("activity_logs")
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([propertyId])
+  @@index([createdAt])
+}
